@@ -1,0 +1,43 @@
+##R Code for topGO analysis of Mytilus proteins
+##for additional information see: http://avrilomics.blogspot.com/2015/07/using-topgo-to-test-for-go-term.html
+
+##Begin by loading the topGO library into R
+source("https://bioconductor.org/biocLite.R")
+biocLite("topGO")
+library(topGO)
+
+##Read in GO Annotations for each protein
+##The file should be tab-delimited, where the first column is the gene name and the second column contains a list of GO terms
+##no headings 
+##each GO term spearated by a comma and a space (no quotations)
+##e.g. F2XEX0	GO:0097200
+geneID2GO <- readMappings(file = "Gallo Gene Universe.txt")
+
+##Define background list (i.e gene universe) and list of genes of interest
+##Just alter the list of genes in the genes of interest file to perform analysis on different gene lists
+geneUniverse <- names(geneID2GO)
+genesOfInterest <- read.table("Gallo BONDS Upper Quartile.txt",header=FALSE)
+genesOfInterest <- as.character(genesOfInterest$V1)
+
+##Next tell software where the interesting genes reside in the gene universe file
+geneList <- factor(as.integer(geneUniverse %in% genesOfInterest))
+names(geneList) <- geneUniverse
+
+##Need to build the topGOdata file that is used to perform the analysis
+##The 'ontology' argument can be 'BP' (biological process), 'MF' (molecular function), or 'CC' (cellular component)
+##The 'description' argument has a short description of your project
+##The 'allGenes' argument specifies all the genes in the 'gene universe', and which of those are  your genes of interest
+##The 'annot' argument tells topGO how to map genes to GO annotations:
+##'annot'=annFUN.gene2GO means that the user provides gene-to-GO annotations
+##we specify here that they are in object 'geneID2GO' (see above for how this was created).
+##optional: nodeSize': this is used to prune the GO hierarchy: 
+##eg. nodesize=10 prunes the GO hierarchy, to remove terms which have less than 10 annotated genes
+myGOdata <- new("topGOdata", description="My project", ontology="BP", allGenes=geneList,  annot = annFUN.gene2GO, gene2GO = geneID2GO)
+
+##Perform the enrichment test
+resultFisher <- runTest(myGOdata, algorithm="classic", statistic="fisher")
+##note that multiple test correcting is not recommended
+
+##Arrange results based on top 10 over-represented categories
+allRes <- GenTable(myGOdata, classicFisher = resultFisher, orderBy = "resultFisher", ranksOf = "classicFisher", topNodes = 10)
+write.table(allRes,"Gallo_Top50%_GO_Analysis.txt",quote=FALSE,col.names=TRUE,row.names=TRUE,sep="\t")
